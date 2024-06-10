@@ -22,6 +22,8 @@ class Notification:
 class DeadlineBot:
     def __init__(self, token: str):
         self.bot = telebot.TeleBot(token)
+        self.name = ''
+        self.date = []
         self.deadlines = []
         self.notifications = []
         self.chat_id = None
@@ -43,26 +45,39 @@ class DeadlineBot:
                               /add_notification, /edit_notification, /list_deadlines to manage your deadlines and notifications.")
         time = datetime.strptime('12:00', "%H:%M").time()
         self.notifications.append(Notification(datetime.combine(datetime.now(), time)))
-        self.schedule_notification()
+        self.schedule_notification(datetime.combine(datetime.now(), time))
+
     def add_deadline(self, message):
+        msg = self.bot.reply_to(message, 'Что надо сделать?')
+        self.bot.register_next_step_handler(msg, self.process_name)
+
+    def process_name(self, message):
+        try:
+            arg = message.text
+            self.name = arg
+            msg = self.bot.reply_to(message, 'Введите дату дедлайна!')
+        except:
+            self.bot.send_message(message.chat.id,'oops')
+        self.bot.register_next_step_handler(msg, self.process_date)
+
+    def process_date(self, message):
         try:
             now = datetime.now()
-            args = message.text.split()[1:]
-            print(args)
-            name = args[0]
-            due_date = datetime.strptime(args[1] + " " + args[2], "%d-%m-%Y %H:%M")
-            
+            args = message.text.split()
+            due_date = datetime.strptime(args[0] + " " + args[1], "%d-%m-%Y %H:%M")
             if due_date < now:
                 self.bot.send_message(message.chat.id, 'Deadline has been expired, eblan ti koroche')
             else:
-                self.deadlines.append(Deadline(name, due_date))
-                self.bot.send_message(message.chat.id, f"Deadline '{name}' added for {due_date}")
+                self.deadlines.append(Deadline(self.name, due_date))
+                self.bot.send_message(message.chat.id, f"Deadline '{self.name}' added for {due_date}")
         except (IndexError, ValueError):
             self.bot.send_message(message.chat.id, "Usage: /add_deadline <name> <DD-MM-YYYY> <HH:MM>")
 
+
     def delete_deadline(self, message):
-        args = message.text.split()[1:]
-        self.deadlines = [deadline for deadline in self.deadlines if deadline.name != args[0]]
+        args = message.text.split()
+        print(args)
+        self.deadlines = [deadline for deadline in self.deadlines if deadline.name != ' '.join(args[1:])]
 
     def add_notification(self, message):
         try:
@@ -109,13 +124,6 @@ class DeadlineBot:
             deadlines_str = "\n".join(str(deadline) for deadline in self.deadlines)
             self.bot.send_message(message.chat.id, f"Current deadlines:\n{deadlines_str}")
 
-    # def remove_expired_deadlines_logic(self):
-    #     now = datetime.now()
-    #     self.deadlines = [deadline for deadline in self.deadlines if deadline.due_date > now]
-
-    # def remove_expired_deadlines(self, message):
-    #         self.remove_expired_deadlines_logic()
-    #         self.bot.send_message(message.chat.id, "Expired deadlines have been removed.")
 
     def schedule_notification(self, time: datetime):
         now = datetime.now()
