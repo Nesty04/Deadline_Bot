@@ -34,12 +34,16 @@ class DeadlineBot:
         self.bot.message_handler(commands=['edit_notification'])(self.edit_notification)
         self.bot.message_handler(commands=['list_deadlines'])(self.list_deadlines)
         self.bot.message_handler(commands=['delete_deadline'])(self.delete_deadline)
+        self.bot.message_handler(commands=['list_notification'])(self.list_notification)
 
 
     def start(self, message):
         self.chat_id = message.chat.id
         self.bot.send_message(message.chat.id, "Welcome to the Deadline Bot! Use /add_deadline, \
                               /add_notification, /edit_notification, /list_deadlines to manage your deadlines and notifications.")
+        time = datetime.strptime('12:00', "%H:%M").time()
+        self.notifications.append(Notification(datetime.combine(datetime.now(), time)))
+        self.schedule_notification()
     def add_deadline(self, message):
         try:
             now = datetime.now()
@@ -62,6 +66,7 @@ class DeadlineBot:
 
     def add_notification(self, message):
         try:
+            args = message.split()[1:]
             args = message.text.split()[1:]
             time = datetime.strptime(args[0], "%H:%M").time()
             notification_time = datetime.combine(datetime.now(), time)
@@ -69,7 +74,14 @@ class DeadlineBot:
             self.schedule_notification(notification_time)
             self.bot.send_message(message.chat.id, f"Notification set for {time}")
         except (IndexError, ValueError):
-            self.bot.send_message(message.chat.id, "Usage: /add_notification <HH:MM:SS>")
+            self.bot.send_message(message.chat.id, "Usage: /add_notification <HH:MM>")
+    
+    def list_notification(self, message):
+        if not self.notifications:
+            self.bot.send_message(message.chat.id, "No notifications set.")
+        else:
+            notifications_str = "\n".join(str(notification) for notification in self.notifications)
+            self.bot.send_message(message.chat.id, f"Current notifications:\n{notifications_str}")
 
     def edit_notification(self, message):
         try:
@@ -80,7 +92,8 @@ class DeadlineBot:
                 if notification.time.time() == old_time:
                     notification.time = datetime.combine(datetime.now(), new_time)
                     self.schedule_notification(notification.time)
-                    self.bot.send_message(message.chat.id, f"Notification time updated from {old_time} to {new_time}")
+                    self.bot.send_message(message.chat.id,
+                                           f"Notification time updated from {old_time} to {new_time}")
                     break
             else:
                 self.bot.send_message(message.chat.id, "No notification found at that time.")
@@ -122,8 +135,9 @@ class DeadlineBot:
 
     def run(self):
         self.bot.infinity_polling()
+        
 
 if __name__ == "__main__":
-    TOKEN = "7204734336:AAGpG5Ovp1-r8btiPDfZsK3fgtdu7C-uj4w"
+    TOKEN = ""
     bot = DeadlineBot(TOKEN)
     bot.run()
