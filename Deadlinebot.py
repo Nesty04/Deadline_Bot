@@ -16,6 +16,7 @@ class DeadlineBot:
         self.bot.message_handler(commands=['list_deadlines'])(self.list_deadlines)
         self.bot.message_handler(commands=['delete_deadline'])(self.delete_deadline)
         self.bot.message_handler(commands=['list_notification'])(self.list_notification)
+        self.bot.message_handler(commands=['edit_deadline'])(self.edit_deadline)
 
     def start(self, message):
         chat_id = message.chat.id
@@ -38,21 +39,22 @@ class DeadlineBot:
     def process_name_deadline(self, message, chat_id):
         name = message.text
         self.user_data[chat_id]['current_deadline_name'] = name
-        msg = self.bot.reply_to(message, 'Введите дату дедлайна в формате <DD-MM-YYYY> <HH:MM>')
+        msg = self.bot.reply_to(message, 'Введите дату дедлайна в формате <DD.MM.YYYY> <HH:MM>')
         self.bot.register_next_step_handler(msg, self.process_date_deadline, chat_id)
 
     def process_date_deadline(self, message, chat_id):
         try:
-            due_date = datetime.strptime(message.text, "%d-%m-%Y %H:%M")
+            due_date = datetime.strptime(message.text, "%d.%m.%Y %H:%M")
+            formatted_date = due_date.strftime('%d.%m.%Y %H:%M')
             now = datetime.now()
             if due_date < now:
                 self.bot.send_message(chat_id, 'Дедлайн уже сгорел!')
             else:
                 name = self.user_data[chat_id].pop('current_deadline_name')
                 self.user_data[chat_id]['deadlines'].append(Deadline(name, due_date))
-                self.bot.send_message(chat_id, f"Дедлайн '{name}' установлен на {due_date}")
+                self.bot.send_message(chat_id, f"Дедлайн '{name}' установлен на {formatted_date}")
         except (IndexError, ValueError):
-            self.bot.send_message(chat_id, "Использование: <DD-MM-YYYY> <HH:MM>")
+            self.bot.send_message(chat_id, "Использование: <DD.MM.YYYY> <HH:MM>")
 
     def delete_deadline(self, message):
         chat_id = message.chat.id
@@ -62,6 +64,36 @@ class DeadlineBot:
     def process_name_delete_deadline(self, message, chat_id):
         name = message.text
         self.user_data[chat_id]['deadlines'] = [deadline for deadline in self.user_data[chat_id]['deadlines'] if deadline.name != name]
+
+    def edit_deadline(self, message):
+        chat_id = message.chat.id
+        msg = self.bot.reply_to(message, 'Введите название дедлайна, который нужно изменить:')
+        self.bot.register_next_step_handler(msg, self.process_name_edit_deadline, chat_id)
+
+    def process_name_edit_deadline(self, message, chat_id):
+        self.user_data[chat_id]['current_edit_deadline_name'] = message.text
+        msg = self.bot.reply_to(message, 'Введите новую дату дедлайна в формате <DD.MM.YYYY> <HH:MM>')
+        self.bot.register_next_step_handler(msg, self.process_date_edit_deadline, chat_id)
+
+    def process_date_edit_deadline(self, message, chat_id):
+        try:
+            new_due_date = datetime.strptime(message.text, "%d.%m.%Y %H:%M")
+            formatted_new_due_date = new_due_date.strftime('%d.%m.%Y %H:%M')
+            now = datetime.now()
+            if new_due_date < now:
+                self.bot.send_message(chat_id, 'Новая дата дедлайна уже прошла!')
+            else:
+                name = self.user_data[chat_id].pop('current_edit_deadline_name')
+                deadlines = self.user_data[chat_id]['deadlines']
+                for deadline in deadlines:
+                    if deadline.name == name:
+                        deadline.due_date = new_due_date
+                        self.bot.send_message(chat_id, f"Дедлайн '{name}' изменен на {formatted_new_due_date}")
+                        break
+                else:
+                    self.bot.send_message(chat_id, "Дедлайн не найден.")
+        except (IndexError, ValueError):
+            self.bot.send_message(chat_id, "Использование: <DD.MM.YYYY> <HH:MM>")
 
     def add_notification(self, message):
         chat_id = message.chat.id
