@@ -6,7 +6,7 @@ class Deadline:
         self.due_date = due_date
 
     def __str__(self):
-        return f"{self.name} - {self.due_date.strftime('%d-%m-%Y %H:%M')}"
+        return f"{self.name} - {self.due_date.strftime('%d.%m.%Y %H:%M')}"
 
 class Notification:
     def __init__(self, time: datetime):
