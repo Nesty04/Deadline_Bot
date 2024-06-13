@@ -164,16 +164,25 @@ class DeadlineBot:
         try:
             time = datetime.strptime(message.text, "%H:%M").time()
             notification_time = datetime.combine(datetime.now(), time)
-            self.user_data[chat_id]['notifications'].append(Notification(notification_time))
-            self.save_notification(chat_id, notification_time)
-            self.schedule_notification(chat_id, notification_time)
-            self.bot.send_message(chat_id, f"Уведомление установлено на: {time.strftime('%H:%M')}")
+            if any(n.time.time() == time for n in self.user_data[chat_id]['notifications']):
+                self.bot.send_message(chat_id, "Уведомление на это время уже установлено.")
+            else:
+                self.user_data[chat_id]['notifications'].append(Notification(notification_time))
+                self.save_notification(chat_id, notification_time)
+                self.schedule_notification(chat_id, notification_time)
+                self.bot.send_message(chat_id, f"Уведомление установлено на: {time.strftime('%H:%M')}")
         except (IndexError, ValueError):
             self.bot.send_message(chat_id, "Формат: <HH:MM>")
 
     def list_notification(self, message):
         chat_id = message.chat.id
         notifications = self.user_data[chat_id]['notifications']
+        valid_notifications = []
+        for notification1 in notifications:
+            for notification2 in notifications:
+                if notification1.time != notification2.time and notification1 != notification2:
+                    valid_notifications.append(notification1)
+        self.user_data[chat_id]['notifications'] = valid_notifications
         if not notifications:
             self.bot.send_message(chat_id, "Никаких уведомлений не установлено.")
         else:
@@ -194,6 +203,7 @@ class DeadlineBot:
             for notification in notifications:
                 if notification.time.time() == old_time:
                     self.delete_notification_from_db(chat_id, old_time)
+                    self.user_data[chat_id]['notifications'].remove(notification.time)
                     notification.time = datetime.combine(datetime.now(), new_time)
                     self.save_notification(chat_id, notification.time)
                     self.schedule_notification(chat_id, notification.time)
@@ -214,7 +224,7 @@ class DeadlineBot:
                 valid_deadlines.append(deadline)
             else:
                 self.delete_deadline_from_db(chat_id, deadline.name)
-        deadlines = valid_deadlines
+        self.user_data[chat_id]['deadlines'] = valid_deadlines
         if not deadlines:
             self.bot.send_message(chat_id, "Никаких дедлайнов не установлено.")
         else:
