@@ -22,6 +22,7 @@ class DeadlineBot:
         self.bot.message_handler(commands=['delete_deadline'])(self.delete_deadline)
         self.bot.message_handler(commands=['list_notification'])(self.list_notification)
         self.bot.message_handler(commands=['edit_deadline'])(self.edit_deadline)
+        self.bot.message_handler(commands=['delete_notification'])(self.delete_notification)
 
     def create_tables(self):
         cursor = self.conn.cursor()
@@ -188,6 +189,26 @@ class DeadlineBot:
         else:
             notifications_str = "\n".join(str(notification) for notification in notifications)
             self.bot.send_message(chat_id, f"Текущие уведомления:\n{notifications_str}")
+
+    def delete_notification(self, message):
+        chat_id = message.chat.id
+        msg = self.bot.reply_to(message, 'Введите время уведомления в формате: <HH:MM>, которое нужно удалить:')
+        self.bot.register_next_step_handler(msg, self.process_time_delete_notification, chat_id)
+
+    def process_time_delete_notification(self, message, chat_id):
+        try:
+            time = datetime.strptime(message.text, "%H:%M")
+            notifications = self.user_data[chat_id]['notifications']
+            for notification in notifications:
+                if notification.time.time() == time.time():
+                    self.delete_notification_from_db(chat_id, time)
+                    self.user_data[chat_id]['notifications'].remove(notification)
+                    self.bot.send_message(chat_id, f"Уведомление на время {time.strftime('%H:%M')} удалено.")
+                    break
+                else:
+                    self.bot.send_message(chat_id, f"Уведомление на время {time.strftime('%H:%M')} не найдено.")
+        except (IndexError, ValueError):
+            self.bot.send_message(chat_id, "Формат: <HH:MM>")
 
     def edit_notification(self, message):
         chat_id = message.chat.id
